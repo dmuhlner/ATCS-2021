@@ -2,8 +2,16 @@ import random
 
 
 class TicTacToe:
-    def __init__(self):
+    random_game = 1
+    user_game = 0
+
+    def __init__(self, type):
         self.board = "\t1\t2\t3\nA\t-\t-\t-\nB\t-\t-\t-\nC\t-\t-\t-\n"
+
+        # self.user_game = 0
+        # self.random_game = 1
+
+        self.type = type
 
         self.A1 = 9
         self.A2 = 11
@@ -14,6 +22,7 @@ class TicTacToe:
         self.C1 = 25
         self.C2 = 27
         self.C3 = 29
+        self.indices = [9,11,13,17,19,21,25,27,29]
 
         self.won = False
 
@@ -42,6 +51,9 @@ class TicTacToe:
             return False
         loc = self.getIndex(index)
         return self.board[loc] == "-"
+
+    def is_valid_AI_move(self, index):
+        return self.board[index] == "-"
 
     def place_player(self, player, index):
         self.board = self.board[0:index] + player + self.board[index + 1:]
@@ -85,8 +97,11 @@ class TicTacToe:
 
 
     def take_turn(self, player):
-        print(player+": it is your turn to move")
-        self.take_manual_turn(player)
+        if self.type == self.user_game or player == "X":
+            print(player + ": it is your turn to move")
+            self.take_manual_turn(player)
+        elif self.type == self.random_game:
+            self.take_random_turn(player)
         return
 
     def check_col_win(self, player):
@@ -122,12 +137,24 @@ class TicTacToe:
             return True
         return False
 
+    def take_random_turn(self, player):
+        valid = False
+        while not valid:
+            move = random.randrange(8)
+
+            if self.is_valid_AI_move(self.indices[move]):
+                self.place_player(player,self.indices[move])
+                return
+
+        print(move)
+
     def reset(self):
         self.board = "\t1\t2\t3\nA\t-\t-\t-\nB\t-\t-\t-\nC\t-\t-\t-\n"
         self.won = False
         self.print_board()
 
     def play_game(self):
+
         self.reset()
         self.print_instructions()
         player = "O"
@@ -136,6 +163,7 @@ class TicTacToe:
                 player = "O"
             else:
                 player = "X"
+
             self.take_turn(player)
             self.won = self.check_win(player)
             self.print_board()
@@ -147,7 +175,7 @@ class TicTacToe:
         else:
             print("Tie")
 
-        again = input("Would you like to play again?")
+        again = input("Would you like to play again?\n")
         if again == "Yes" or again == "yes":
             self.play_game()
         return
