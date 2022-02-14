@@ -4,12 +4,32 @@ import random
 class TicTacToe:
     random_game = 1
     user_game = 0
+    minimax_game = 2
+    ai_only_game = 3
 
-    def __init__(self, type):
+    def __init__(self, type = None):
         self.board = "\t1\t2\t3\nA\t-\t-\t-\nB\t-\t-\t-\nC\t-\t-\t-\n"
 
         # self.user_game = 0
         # self.random_game = 1
+
+        if type is None:
+            playerIn = ""
+            while playerIn != "minimax" and playerIn != "random" and playerIn != "user" and playerIn != "ai":
+                print("What type of game would you like to play? Options:\nMinimax\nRandom\nUser\nAI")
+                playerIn = input().lower()
+            if playerIn == "minimax":
+                type = TicTacToe.minimax_game
+            elif playerIn == "random":
+                type = TicTacToe.random_game
+            elif playerIn == "user":
+                type = TicTacToe.user_game
+            elif playerIn == "ai":
+                type = TicTacToe.ai_only_game
+        elif isinstance(type, int) and (type == 0 or type == 1 or type ==2 or type == 3):
+            type = type
+        else:
+            return
 
         self.type = type
 
@@ -22,7 +42,7 @@ class TicTacToe:
         self.C1 = 25
         self.C2 = 27
         self.C3 = 29
-        self.indices = [9,11,13,17,19,21,25,27,29]
+        self.indices = [self.A1,self.A2,self.A3,self.B1,self.B2,self.B3,self.C1,self.C2,self.C3]
 
         self.won = False
 
@@ -52,12 +72,11 @@ class TicTacToe:
         loc = self.getIndex(index)
         return self.board[loc] == "-"
 
-    def is_valid_AI_move(self, index):
-        return self.board[index] == "-"
+    def is_valid_AI_move(self, index, board):
+        return board[index] == "-"
 
     def place_player(self, player, index):
         self.board = self.board[0:index] + player + self.board[index + 1:]
-        return
 
     def take_manual_turn(self, player):
         index = None
@@ -95,45 +114,48 @@ class TicTacToe:
                if second == "3":
                    return self.C3
 
-
     def take_turn(self, player):
-        if self.type == self.user_game or player == "X":
+        if self.type == self.ai_only_game:
+            self.take_minimax_turn(player)
+        elif self.type == self.user_game or player == "X":
             print(player + ": it is your turn to move")
             self.take_manual_turn(player)
         elif self.type == self.random_game:
             self.take_random_turn(player)
+        elif self.type == self.minimax_game:
+            self.take_minimax_turn(player)
         return
 
-    def check_col_win(self, player):
-        if self.board[self.A1] == player and self.board[self.A2] == player and self.board[self.A3] == player:
+    def check_col_win(self, player, board):
+        if board[self.A1] == player and board[self.A2] == player and board[self.A3] == player:
             return True
-        if self.board[self.B1] == player and self.board[self.B2] == player and self.board[self.B3] == player:
+        if board[self.B1] == player and board[self.B2] == player and board[self.B3] == player:
             return True
-        if self.board[self.C1] == player and self.board[self.C2] == player and self.board[self.C3] == player:
-            return True
-        return False
-
-    def check_row_win(self, player):
-        if self.board[self.A1] == player and self.board[self.B1] == player and self.board[self.C1] == player:
-            return True
-        if self.board[self.A2] == player and self.board[self.B2] == player and self.board[self.C2] == player:
-            return True
-        if self.board[self.A3] == player and self.board[self.B3] == player and self.board[self.C3] == player:
+        if board[self.C1] == player and board[self.C2] == player and board[self.C3] == player:
             return True
         return False
 
-    def check_diag_win(self, player):
-        if self.board[self.A1] == player and self.board[self.B2] == player and self.board[self.C3] == player:
+    def check_row_win(self, player, board):
+        if board[self.A1] == player and board[self.B1] == player and board[self.C1] == player:
             return True
-        if self.board[self.C1] ==player and self.board[self.B2] == player and self.board[self.A3] == player:
+        if board[self.A2] == player and board[self.B2] == player and board[self.C2] == player:
+            return True
+        if board[self.A3] == player and board[self.B3] == player and board[self.C3] == player:
             return True
         return False
 
-    def check_win(self, player):
-        return self.check_col_win(player) or self.check_row_win(player) or self.check_diag_win(player)
+    def check_diag_win(self, player, board):
+        if board[self.A1] == player and board[self.B2] == player and board[self.C3] == player:
+            return True
+        if board[self.C1] == player and board[self.B2] == player and board[self.A3] == player:
+            return True
+        return False
 
-    def check_tie(self):
-        if self.board.count("-") == 0:
+    def check_win(self, player, board):
+        return self.check_col_win(player, board) or self.check_row_win(player, board) or self.check_diag_win(player, board)
+
+    def check_tie(self, board):
+        if board.count("-") == 0:
             return True
         return False
 
@@ -142,7 +164,7 @@ class TicTacToe:
         while not valid:
             move = random.randrange(8)
 
-            if self.is_valid_AI_move(self.indices[move]):
+            if self.is_valid_AI_move(self.indices[move], self.board):
                 self.place_player(player,self.indices[move])
                 return
 
@@ -152,6 +174,57 @@ class TicTacToe:
         self.board = "\t1\t2\t3\nA\t-\t-\t-\nB\t-\t-\t-\nC\t-\t-\t-\n"
         self.won = False
         self.print_board()
+
+    def opposite_player(self, player):
+        if player == "X":
+            return "O"
+        return "X"
+
+    def minimax(self, player, max):
+        if self.check_win("O", self.board):
+            return 10
+        elif self.check_win(self.opposite_player("O"), self.board):
+            return -10
+        if self.check_tie(self.board):
+            return 0
+
+        present_board = self.board
+        keep = 0
+        if max:
+            keep_success = -11
+            for move in self.indices:
+                self.board = present_board
+                if self.is_valid_AI_move(move, self.board):
+                    self.place_player(player, move)
+                    success = self.minimax(self.opposite_player(player), False)
+                    if success > keep_success:
+                        keep = move
+                        keep_success = success
+        else:
+            keep_success = 11
+            for move in self.indices:
+                self.board = present_board
+                if self.is_valid_AI_move(move, self.board):
+                    self.place_player(player, move)
+                    success = self.minimax(self.opposite_player(player), True)
+                    if success < keep_success:
+                        keep = move
+                        keep_success = success
+        self.board = present_board
+        return keep_success
+
+    def take_minimax_turn(self, player):
+        best = [0, -11]
+        present_board = self.board
+        for move in self.indices:
+            self.board = present_board
+            if self.is_valid_AI_move(move, self.board):
+                self.place_player(player, move)
+                current = [move, self.minimax(self.opposite_player(player), False)]
+                if current[1] > best[1]:
+                    best = current
+        self.board = present_board
+        self.place_player(player, best[0])
 
     def play_game(self):
 
@@ -165,9 +238,9 @@ class TicTacToe:
                 player = "X"
 
             self.take_turn(player)
-            self.won = self.check_win(player)
+            self.won = self.check_win(player, self.board)
             self.print_board()
-            if self.check_tie():
+            if self.check_tie(self.board):
                 break
 
         if self.won:
