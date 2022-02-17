@@ -1,4 +1,5 @@
 import random
+import time
 
 
 class TicTacToe:
@@ -6,6 +7,8 @@ class TicTacToe:
     user_game = 0
     minimax_game = 2
     ai_only_game = 3
+    fair_game = 4
+    alpha_beta = 5
 
     def __init__(self, type = None):
         self.board = "\t1\t2\t3\nA\t-\t-\t-\nB\t-\t-\t-\nC\t-\t-\t-\n"
@@ -15,8 +18,8 @@ class TicTacToe:
 
         if type is None:
             playerIn = ""
-            while playerIn != "minimax" and playerIn != "random" and playerIn != "user" and playerIn != "ai":
-                print("What type of game would you like to play? Options:\nMinimax\nRandom\nUser\nAI")
+            while playerIn != "minimax" and playerIn != "random" and playerIn != "user" and playerIn != "ai" and playerIn != "fair" and playerIn != "ab":
+                print("What type of game would you like to play? Options:\nMinimax\nRandom\nUser\nAI\nFair\nAB")
                 playerIn = input().lower()
             if playerIn == "minimax":
                 type = TicTacToe.minimax_game
@@ -26,7 +29,11 @@ class TicTacToe:
                 type = TicTacToe.user_game
             elif playerIn == "ai":
                 type = TicTacToe.ai_only_game
-        elif isinstance(type, int) and (type == 0 or type == 1 or type ==2 or type == 3):
+            elif playerIn == "fair":
+                type = TicTacToe.fair_game
+            elif playerIn == "ab":
+                type = TicTacToe.alpha_beta
+        elif isinstance(type, int) and (type == 0 or type == 1 or type ==2 or type == 3 or type == 4 or type == 5):
             type = type
         else:
             return
@@ -123,7 +130,11 @@ class TicTacToe:
         elif self.type == self.random_game:
             self.take_random_turn(player)
         elif self.type == self.minimax_game:
-            self.take_minimax_turn(player)
+            self.take_minimax_turn(player, 0)
+        elif self.type == self.fair_game:
+            self.take_minimax_turn(player, 1)
+        elif self.type == self.alpha_beta:
+            self.take_ab_turn(player)
         return
 
     def check_col_win(self, player, board):
@@ -180,7 +191,7 @@ class TicTacToe:
             return "O"
         return "X"
 
-    def minimax(self, player, max):
+    def minimax(self, player, max, depth):
         if self.check_win("O", self.board):
             return 10
         elif self.check_win(self.opposite_player("O"), self.board):
@@ -188,46 +199,104 @@ class TicTacToe:
         if self.check_tie(self.board):
             return 0
 
-        present_board = self.board
-        keep = 0
-        if max:
-            keep_success = -11
-            for move in self.indices:
-                self.board = present_board
-                if self.is_valid_AI_move(move, self.board):
-                    self.place_player(player, move)
-                    success = self.minimax(self.opposite_player(player), False)
-                    if success > keep_success:
-                        keep = move
-                        keep_success = success
-        else:
-            keep_success = 11
-            for move in self.indices:
-                self.board = present_board
-                if self.is_valid_AI_move(move, self.board):
-                    self.place_player(player, move)
-                    success = self.minimax(self.opposite_player(player), True)
-                    if success < keep_success:
-                        keep = move
-                        keep_success = success
-        self.board = present_board
-        return keep_success
+        if depth != 0:
+            present_board = self.board
+            keep = 0
+            if max:
+                keep_success = -11
+                for move in self.indices:
+                    self.board = present_board
+                    if self.is_valid_AI_move(move, self.board):
+                        self.place_player(player, move)
+                        success = self.minimax(self.opposite_player(player), False, depth - 1)
+                        if success > keep_success:
+                            keep = move
+                            keep_success = success
+            else:
+                keep_success = 11
+                for move in self.indices:
+                    self.board = present_board
+                    if self.is_valid_AI_move(move, self.board):
+                        self.place_player(player, move)
+                        success = self.minimax(self.opposite_player(player), True, depth - 1)
+                        if success < keep_success:
+                            keep = move
+                            keep_success = success
+            self.board = present_board
+            return keep_success
+        return 0
 
-    def take_minimax_turn(self, player):
+    def ab_minimax(self, player, max, depth, alpha, beta):
+        if self.check_win("O", self.board):
+            return 10
+        elif self.check_win(self.opposite_player("O"), self.board):
+            return -10
+        if self.check_tie(self.board):
+            return 0
+
+        if depth != 0:
+            present_board = self.board
+            keep = 0
+            if max:
+                for move in self.indices:
+                    self.board = present_board
+                    if self.is_valid_AI_move(move, self.board):
+                        self.place_player(player, move)
+                        success = self.ab_minimax(self.opposite_player(player), False, depth - 1, alpha, beta)
+                        if success > alpha:
+                            keep = move
+                            alpha = success
+                    if alpha >= beta:
+                        break
+                self.board = present_board
+                return alpha
+            else:
+                for move in self.indices:
+                    self.board = present_board
+                    if self.is_valid_AI_move(move, self.board):
+                        self.place_player(player, move)
+                        success = self.ab_minimax(self.opposite_player(player), True, depth - 1, alpha, beta)
+                        if success < beta:
+                            keep = move
+                            beta = success
+                    if beta <= alpha:
+                        break
+                self.board = present_board
+                return beta
+        return 0
+
+    def take_minimax_turn(self, player, version):
+        if version == 1:
+            depth = 3
+        else:
+            depth = 100
+
         best = [0, -11]
         present_board = self.board
         for move in self.indices:
             self.board = present_board
             if self.is_valid_AI_move(move, self.board):
                 self.place_player(player, move)
-                current = [move, self.minimax(self.opposite_player(player), False)]
+                current = [move, self.minimax(self.opposite_player(player), False, depth)]
+                if current[1] > best[1]:
+                    best = current
+        self.board = present_board
+        self.place_player(player, best[0])
+
+    def take_ab_turn(self, player):
+        best = [0, -110]
+        present_board = self.board
+        for move in self.indices:
+            self.board = present_board
+            if self.is_valid_AI_move(move, self.board):
+                self.place_player(player, move)
+                current = [move, self.ab_minimax(self.opposite_player(player), False, 3, best[1], 110)]
                 if current[1] > best[1]:
                     best = current
         self.board = present_board
         self.place_player(player, best[0])
 
     def play_game(self):
-
         self.reset()
         self.print_instructions()
         player = "O"
@@ -236,8 +305,10 @@ class TicTacToe:
                 player = "O"
             else:
                 player = "X"
-
+            start = time.time()
             self.take_turn(player)
+            end = time.time()
+            print("This turn took: ", end-start, " seconds")
             self.won = self.check_win(player, self.board)
             self.print_board()
             if self.check_tie(self.board):
@@ -249,7 +320,6 @@ class TicTacToe:
             print("Tie")
 
         again = input("Would you like to play again?\n")
-        if again == "Yes" or again == "yes":
+        if again == "Yes" or again == "yes" or again == "y" or again == "Y":
             self.play_game()
         return
-
