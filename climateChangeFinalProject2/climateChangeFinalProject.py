@@ -10,10 +10,22 @@ import geopy.distance
 # dataframe = ds.to_dataframe()
 # print(dataframe.shape)
 
-data = nc.Dataset("crop yield data/maize/yield_1981.nc4")
-vars = data.variables
-print(data["var"])
 
+data = xr.open_dataarray("gdhy_v1.2_v1.3_20190128/maize/yield_1993.nc4")
+
+print(data.values)
+
+
+#def fillArrays():
+
+
+data = xr.Dataset(coords = {"year": range(1981, 2016)})
+
+#
+# yields = data["var"][:]
+
+#
+# print(otherVals)
 
 
 # h = nc.variables[vname]
