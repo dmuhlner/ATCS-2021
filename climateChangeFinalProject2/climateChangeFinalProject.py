@@ -1,3 +1,5 @@
+import time
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,7 +14,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 import dask_ml as dml
 from sklearn_xarray import preprocessing
+import sklearn.neural_network as nn
 
+start = time.time()
 ccrs = cr.crs
 
 
@@ -107,8 +111,8 @@ def makePreProcess(X):
     wrapper.fit(X)
     wrapper2 = skx.wrap(train_test_split())
     wrapper2.fit(X)
-
-data = xr.open_dataset("combinedDataset.nc4")
+#
+# data = xr.open_dataset("combinedDataset.nc4")
 
 def modelFit(coords, rain, tempmax, tempmin, ave, xc, yc, rainc, maxc, minc, avec, xex, yex, rex, maex, miex, avex,scalar):
     x, y = coords
@@ -133,24 +137,42 @@ def modelFit(coords, rain, tempmax, tempmin, ave, xc, yc, rainc, maxc, minc, ave
 # sanitizer = skx.preprocessing.Sanitizer()
 # data = sanitizer.fit_transform(data["Maize", "edSoy", "dRice", "Wheat","timeseries-pr-annual-mean", "timeseries-tas-annual-mean", "timeseries-tasmax-annual-mean", "timeseries-tasmin-annual-mean"])
 #
-data=data.to_dataframe()
-data.to_csv("dataframe.csv")
-print(data)
-print(data.loc(0))
+# data=pd.read_csv("dataframe.csv")
+data = xr.open_dataset("combinedDataset.nc4")
+data = data.to_dataframe()
 # print(data)
-# x = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean", "timeseries-tasmin-annual-mean"]]
-# y = data[["Maize", "edSoy", "dRice", "Wheat"]]
-# print(x)
-# scaler = StandardScaler().fit(x)
-# x = scaler.transform(x)
-#
-# xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2)
-# model = LinearRegression().fit(X=xtrain, y=ytrain)
-#
-# # predict = model.predict(xtest)
-# print(model.score(xtrain, ytrain))
-# print(model.coef_)
+# print(data.loc[[-179.75]].shape)
+def linearModel(data):
+    data = data.dropna()
+    print(data)
+    x = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean", "timeseries-tasmin-annual-mean"]]
+    y = data[["Maize", "edSoy", "dRice", "Wheat"]]
+    print(x)
+    scaler = StandardScaler().fit(x)
+    x = scaler.transform(x)
 
+    xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2)
+    model = LinearRegression().fit(X=xtrain, y=ytrain)
+
+def neuralModel(data):
+    data = data.dropna()
+    print(data)
+    x = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+              "timeseries-tasmin-annual-mean"]]
+    y = data[["Maize", "edSoy", "dRice", "Wheat"]]
+    xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2)
+    scaler = StandardScaler().fit(xtrain)
+    xtrain = scaler.transform(xtrain)
+    xtest = scaler.transform(xtest)
+    neural = nn.MLPRegressor(hidden_layer_sizes=(200, 50, 20), activation = "tanh",  verbose=True, max_iter=2000, solver = "sgd").fit(xtrain, ytrain)
+
+    # predict = model.predict(xtest)
+    print("Train score:", neural.score(xtrain, ytrain))
+    print("Test score:", neural.score(xtest, ytest))
+    print(neural.get_params())
+
+
+neuralModel(data)
 #visualizeSlice(aggregateCrops(), "Maize", 2015)
 #xr.Dataset.to_netcdf(xr.merge([xr.open_dataset("aggregatedClimateData.nc4"), aggregateCrops()]), "combinedDataset.nc4")
 # climate = xr.open_dataset("climateData/annualTimeseries.nc")
@@ -219,3 +241,4 @@ def parseYear(yearIn):
 # ax.set_ylabel(h.units)
 
 #convert float32 time in days since 1900-1-1 to int year
+print("Time spent:", time.time() - start)
