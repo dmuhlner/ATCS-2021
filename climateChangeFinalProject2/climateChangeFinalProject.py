@@ -6,6 +6,12 @@ import xarray as xr
 import geopy.distance
 import dask
 import cartopy as cr
+import sklearn_xarray as skx
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+import dask_ml as dml
+from sklearn_xarray import preprocessing
 
 ccrs = cr.crs
 
@@ -96,6 +102,54 @@ def visualizeSlice(data, independent, year):
     plt.contourf(lons, lats, ind, 60, transform=map)
     plt.show()
 
+def makePreProcess(X):
+    wrapper = skx.wrap(StandardScaler())
+    wrapper.fit(X)
+    wrapper2 = skx.wrap(train_test_split())
+    wrapper2.fit(X)
+
+data = xr.open_dataset("combinedDataset.nc4")
+
+def modelFit(coords, rain, tempmax, tempmin, ave, xc, yc, rainc, maxc, minc, avec, xex, yex, rex, maex, miex, avex,scalar):
+    x, y = coords
+    val= scalar + xc * np.power(x, xex)\
+         + yc * np.power(y, yex) + \
+         rainc * np.power(rain, rex) + \
+         np.power(tempmax, maex) * maxc + \
+         np.power(tempmin, miex) * minc + \
+         np.power(ave, avex) * avec
+    return val
+
+# variable = data._variables["timeseries-pr-annual-mean"]
+# print(variable)
+#
+# data[["Maize", "edSoy", "dRice", "Wheat"]].curvefit(
+#     coords=["lat", "lon"],
+#     reduce_dims=["timeseries-pr-annual-mean", "lon", "timeseries-tasmax-annual-mean", "lat", "timeseries-tasmin-annual-mean", "timeseries-tas-annual-mean"],
+#     func=modelFit)
+#
+# print(data)
+
+# sanitizer = skx.preprocessing.Sanitizer()
+# data = sanitizer.fit_transform(data["Maize", "edSoy", "dRice", "Wheat","timeseries-pr-annual-mean", "timeseries-tas-annual-mean", "timeseries-tasmax-annual-mean", "timeseries-tasmin-annual-mean"])
+#
+data=data.to_dataframe()
+data.to_csv("dataframe.csv")
+print(data)
+print(data.loc(0))
+# print(data)
+# x = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean", "timeseries-tasmin-annual-mean"]]
+# y = data[["Maize", "edSoy", "dRice", "Wheat"]]
+# print(x)
+# scaler = StandardScaler().fit(x)
+# x = scaler.transform(x)
+#
+# xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2)
+# model = LinearRegression().fit(X=xtrain, y=ytrain)
+#
+# # predict = model.predict(xtest)
+# print(model.score(xtrain, ytrain))
+# print(model.coef_)
 
 #visualizeSlice(aggregateCrops(), "Maize", 2015)
 #xr.Dataset.to_netcdf(xr.merge([xr.open_dataset("aggregatedClimateData.nc4"), aggregateCrops()]), "combinedDataset.nc4")
