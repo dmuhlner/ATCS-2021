@@ -1,3 +1,4 @@
+import itertools
 import time
 
 import pandas as pd
@@ -7,17 +8,15 @@ import netCDF4 as nc
 import xarray as xr
 import geopy.distance
 import dask
-import cartopy as cr
-import sklearn_xarray as skx
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-import dask_ml as dml
-from sklearn_xarray import preprocessing
 import sklearn.neural_network as nn
+from sklearn.model_selection import GridSearchCV
+from joblib import dump, load
 
 start = time.time()
-ccrs = cr.crs
+# ccrs = cr.crs
 
 
 
@@ -45,23 +44,23 @@ def combineMFFolder(folder):
 # def precipToYear():
 
 
-def viewPrecipitation(year):
-    precip = xr.open_dataset("climateData/precip1900-2020.nc")
-    #time = pd.date_range("2000-01-01", freq="H", periods=365 * 24)
-    # precip = precip.sel(time="1991-01-16")
-    prec = precip.variables["timeseries-pr-annual-mean"]
-    prec = prec[year-1901, :, :]
-    print(precip)
-    print(nc.Dataset("climateData/climatology-pr-annual-mean_cru_annual_cru-ts4.05-climatology_mean_1991-2020.nc").variables)
-    lats = precip.variables["lat"][:]
-    lons = precip.variables["lon"][:]
-    map = ccrs.PlateCarree()
-
-    ax = plt.axes(projection=map)
-    plt.contourf(lons, lats, prec, 60,transform=map)
-    # ax.coastlines()
-
-    plt.show()
+# def viewPrecipitation(year):
+#     precip = xr.open_dataset("climateData/precip1900-2020.nc")
+#     #time = pd.date_range("2000-01-01", freq="H", periods=365 * 24)
+#     # precip = precip.sel(time="1991-01-16")
+#     prec = precip.variables["timeseries-pr-annual-mean"]
+#     prec = prec[year-1901, :, :]
+#     print(precip)
+#     print(nc.Dataset("climateData/climatology-pr-annual-mean_cru_annual_cru-ts4.05-climatology_mean_1991-2020.nc").variables)
+#     lats = precip.variables["lat"][:]
+#     lons = precip.variables["lon"][:]
+#     map = ccrs.PlateCarree()
+#
+#     ax = plt.axes(projection=map)
+#     plt.contourf(lons, lats, prec, 60,transform=map)
+#     # ax.coastlines()
+#
+#     plt.show()
 
 def checkSame():
     precip = xr.open_dataset("climateData/precip1900-2020.nc")
@@ -95,22 +94,22 @@ def aggregateCrops():
     crops = xr.merge(opened)
     return crops
 
-def visualizeSlice(data, independent, year):
-    ind = data.variables[independent]
-    ind = ind[year - 1981, :, :]
-    lats = data.variables["lat"][:]
-    lons = data.variables["lon"][:]
-    map = ccrs.PlateCarree()
+# def visualizeSlice(data, independent, year):
+#     ind = data.variables[independent]
+#     ind = ind[year - 1981, :, :]
+#     lats = data.variables["lat"][:]
+#     lons = data.variables["lon"][:]
+#     map = ccrs.PlateCarree()
+#
+#     ax = plt.axes(projection=map)
+#     plt.contourf(lons, lats, ind, 60, transform=map)
+#     plt.show()
 
-    ax = plt.axes(projection=map)
-    plt.contourf(lons, lats, ind, 60, transform=map)
-    plt.show()
-
-def makePreProcess(X):
-    wrapper = skx.wrap(StandardScaler())
-    wrapper.fit(X)
-    wrapper2 = skx.wrap(train_test_split())
-    wrapper2.fit(X)
+# def makePreProcess(X):
+#     wrapper = skx.wrap(StandardScaler())
+#     wrapper.fit(X)
+#     wrapper2 = skx.wrap(train_test_split())
+#     wrapper2.fit(X)
 #
 # data = xr.open_dataset("combinedDataset.nc4")
 
@@ -139,13 +138,15 @@ def modelFit(coords, rain, tempmax, tempmin, ave, xc, yc, rainc, maxc, minc, ave
 #
 # data=pd.read_csv("dataframe.csv")
 data = xr.open_dataset("combinedDataset.nc4")
-data = data.to_dataframe()
+data = data.to_dataframe(dim_order=["year", "lon", "lat", "bnds"])
+data = data.reset_index(level="year")
+print(data)
 # print(data)
 # print(data.loc[[-179.75]].shape)
 def linearModel(data):
     data = data.dropna()
     print(data)
-    x = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean", "timeseries-tasmin-annual-mean"]]
+    x = data[["year", "lon_bnds", "lat_bnds", "timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean", "timeseries-tasmin-annual-mean"]]
     y = data[["Maize", "edSoy", "dRice", "Wheat"]]
     print(x)
     scaler = StandardScaler().fit(x)
@@ -156,23 +157,88 @@ def linearModel(data):
 
 def neuralModel(data):
     data = data.dropna()
-    print(data)
-    x = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+    print(data["year"])
+    x = data[["year", "timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
               "timeseries-tasmin-annual-mean"]]
     y = data[["Maize", "edSoy", "dRice", "Wheat"]]
     xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2)
     scaler = StandardScaler().fit(xtrain)
     xtrain = scaler.transform(xtrain)
     xtest = scaler.transform(xtest)
-    neural = nn.MLPRegressor(hidden_layer_sizes=(200, 50, 20), activation = "tanh",  verbose=True, max_iter=2000, solver = "sgd").fit(xtrain, ytrain)
+    dump(scaler, "foodScaler.joblib")
+    neural = nn.MLPRegressor(verbose=True, max_iter=6000, batch_size=20000, activation="tanh", solver="lbfgs", hidden_layer_sizes=(100, 12, 80, 50))
+    # tuneModel(neural, x, y)
+    neural = neural.fit(xtrain, ytrain)
 
     # predict = model.predict(xtest)
     print("Train score:", neural.score(xtrain, ytrain))
     print("Test score:", neural.score(xtest, ytest))
     print(neural.get_params())
+    return neural
+
+def tuneModel(model, X, Y):
+    scaler = StandardScaler().fit(X)
+    X = scaler.transform(X)
+    solver = ["sgd", "adam", "lbfgs"]
+    first = [100, 200, 500]
+    second = [8, 12, 20]
+    third = [50, 80, 100]
+    fourth = [3, 5, 7]
+
+    structures = list(itertools.product(first, second, third, fourth))
+    parameterGrid = dict(solver=solver, hidden_layer_sizes=structures)
+    searchGrid = GridSearchCV(estimator=model, param_grid=parameterGrid, n_jobs=-1, cv=3)
+    gridResult = searchGrid.fit(X, Y)
+    print(gridResult)
+    print("Best: %f using %s" % (gridResult.best_score_, gridResult.best_params_))
 
 
-neuralModel(data)
+# dump(neuralModel(data), "foodModel.joblib")
+# model = load("foodModel.joblib")
+# scaler = load("foodScaler.joblib")
+#
+# data = data.dropna()
+# x = data[["year", "timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+#           "timeseries-tasmin-annual-mean"]]
+# y = data[["Maize", "edSoy", "dRice", "Wheat"]]
+# x = scaler.transform(x)
+# print(model.score(x, y))
+
+def makeModel2(data, filepath):
+    data = data[["year", "lon_bnds", "lat_bnds", "timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+              "timeseries-tasmin-annual-mean"]]
+    data = data.dropna()
+    y = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+              "timeseries-tasmin-annual-mean"]]
+    x = data[["year", "lon_bnds", "lat_bnds"]]
+    xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2)
+    scaler = StandardScaler().fit(xtrain)
+    xtrain = scaler.transform(xtrain)
+    xtest = scaler.transform(xtest)
+    dump(scaler, "weatherScaler.joblib")
+    neural = nn.MLPRegressor(verbose=True, max_iter=10)
+    # tuneModel(neural, x, y)
+    neural = neural.fit(xtrain, ytrain)
+
+    # predict = model.predict(xtest)
+    print("Train score:", neural.score(xtrain, ytrain))
+    print("Test score:", neural.score(xtest, ytest))
+    print(neural.get_params())
+    dump(neural, filepath)
+
+# makeModel2(data, "weatherModel.joblib")
+
+model = load("weatherModel.joblib")
+scaler = load("weatherScaler.joblib")
+data = data[["year", "lon_bnds", "lat_bnds", "timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+              "timeseries-tasmin-annual-mean"]]
+data = data.dropna()
+y = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+          "timeseries-tasmin-annual-mean"]]
+x = data[["year", "lon_bnds", "lat_bnds"]]
+x = scaler.transform(x)
+print(model.score(x, y))
+
 #visualizeSlice(aggregateCrops(), "Maize", 2015)
 #xr.Dataset.to_netcdf(xr.merge([xr.open_dataset("aggregatedClimateData.nc4"), aggregateCrops()]), "combinedDataset.nc4")
 # climate = xr.open_dataset("climateData/annualTimeseries.nc")
@@ -241,4 +307,4 @@ def parseYear(yearIn):
 # ax.set_ylabel(h.units)
 
 #convert float32 time in days since 1900-1-1 to int year
-print("Time spent:", time.time() - start)
+print("Time spent:", time.time() - start, "seconds")
