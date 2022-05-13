@@ -8,18 +8,19 @@ import netCDF4 as nc
 import xarray as xr
 import geopy.distance
 import dask
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-import sklearn.neural_network as nn
-from sklearn.model_selection import GridSearchCV
+# from sklearn.preprocessing import StandardScaler
+# from sklearn.linear_model import LinearRegression
+# from sklearn.model_selection import train_test_split
+# import sklearn.neural_network as nn
+# from sklearn.model_selection import GridSearchCV
 from joblib import dump, load
 
+#start work timer
 start = time.time()
 # ccrs = cr.crs
 
 
-
+#commented code generally is code that was used previously but does not need to be compiled each time it is run
 #data = pd.read_csv("crop yield data/Attainable yields (Mueller et al. 2012).csv")
 # ds = xr.open_dataset("crop yield data/maize/yield_1981.nc4")
 # dataframe = ds.to_dataframe()
@@ -30,13 +31,14 @@ def findTime(filename):
     print(filename)
     return int(year)
 
-
+#function for compiling food datasets
 def preProcess(ds):
     filename = ds.encoding["source"]
     time = findTime(filename)
     data = ds.assign_coords({"year": time})
     print(data)
     return data
+
 
 def combineMFFolder(folder):
     return xr.open_mfdataset((folder + "*.nc4"), preprocess=preProcess, combine="nested", concat_dim = "year")
@@ -62,6 +64,7 @@ def combineMFFolder(folder):
 #
 #     plt.show()
 
+#function to search data and validate that it is not identical to itself
 def checkSame():
     precip = xr.open_dataset("climateData/precip1900-2020.nc")
 
@@ -75,6 +78,7 @@ def checkSame():
 
     print(counter)
     return
+
 
 def aggregateClimate():
     files = ["climateData/annualTimeseries.nc", "climateData/precip1900-2020.nc", "climateData/maxTemps.nc", "climateData/minTemps.nc"]
@@ -113,6 +117,7 @@ def aggregateCrops():
 #
 # data = xr.open_dataset("combinedDataset.nc4")
 
+#function made to be used with xarray ML models (not used)
 def modelFit(coords, rain, tempmax, tempmin, ave, xc, yc, rainc, maxc, minc, avec, xex, yex, rex, maex, miex, avex,scalar):
     x, y = coords
     val= scalar + xc * np.power(x, xex)\
@@ -137,12 +142,14 @@ def modelFit(coords, rain, tempmax, tempmin, ave, xc, yc, rainc, maxc, minc, ave
 # data = sanitizer.fit_transform(data["Maize", "edSoy", "dRice", "Wheat","timeseries-pr-annual-mean", "timeseries-tas-annual-mean", "timeseries-tasmax-annual-mean", "timeseries-tasmin-annual-mean"])
 #
 # data=pd.read_csv("dataframe.csv")
-data = xr.open_dataset("combinedDataset.nc4")
-data = data.to_dataframe(dim_order=["year", "lon", "lat", "bnds"])
-data = data.reset_index(level="year")
-print(data)
+# data = xr.open_dataset("combinedDataset.nc4")
+# data = data.to_dataframe(dim_order=["year", "lon", "lat", "bnds"])
+# data = data.reset_index(level="year")
+# print(data)
 # print(data)
 # print(data.loc[[-179.75]].shape)
+
+#function building linear model (replaced by neural network)
 def linearModel(data):
     data = data.dropna()
     print(data)
@@ -155,6 +162,7 @@ def linearModel(data):
     xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2)
     model = LinearRegression().fit(X=xtrain, y=ytrain)
 
+#function building and training a neural network
 def neuralModel(data):
     data = data.dropna()
     print(data["year"])
@@ -176,6 +184,7 @@ def neuralModel(data):
     print(neural.get_params())
     return neural
 
+#function to try many hyperparameter options concurrently to determine best parameters for neural network
 def tuneModel(model, X, Y):
     scaler = StandardScaler().fit(X)
     X = scaler.transform(X)
@@ -204,6 +213,7 @@ def tuneModel(model, X, Y):
 # x = scaler.transform(x)
 # print(model.score(x, y))
 
+#function to make second neural network (focused on weather data)
 def makeModel2(data, filepath):
     data = data[["year", "lon_bnds", "lat_bnds", "timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
               "timeseries-tasmin-annual-mean"]]
@@ -227,17 +237,67 @@ def makeModel2(data, filepath):
     dump(neural, filepath)
 
 # makeModel2(data, "weatherModel.joblib")
-
-model = load("weatherModel.joblib")
-scaler = load("weatherScaler.joblib")
-data = data[["year", "lon_bnds", "lat_bnds", "timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+#function to verify functionality of weather model
+def checkWeather(data):
+    model = load("weatherModel.joblib")
+    scaler = load("weatherScaler.joblib")
+    data = data[["year", "lon_bnds", "lat_bnds", "timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
               "timeseries-tasmin-annual-mean"]]
-data = data.dropna()
-y = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
+    data = data.dropna()
+    y = data[["timeseries-tas-annual-mean", "timeseries-pr-annual-mean", "timeseries-tasmax-annual-mean",
           "timeseries-tasmin-annual-mean"]]
-x = data[["year", "lon_bnds", "lat_bnds"]]
-x = scaler.transform(x)
-print(model.score(x, y))
+    x = data[["year", "lon_bnds", "lat_bnds"]]
+    x = scaler.transform(x)
+    print(model.score(x, y))
+
+#function for UX
+def getYearAndLocation():
+    year = input("Year for prediction:")
+    lon = input("Longitude for prediction:")
+    lat = input("Latitude for prediction:")
+    return year, lon, lat
+
+#main UX function
+def makePrediction():
+    year, lon, lat = getYearAndLocation()
+    weatherData = predictWeather(year, lon, lat)
+    foodData = predictFood(weatherData, year)
+    dataSet = xr.open_dataset("combinedDataset.nc4")
+    compareSet = dataSet.sel(year=[2016], lon=[lon], lat=[lat], method="nearest")
+    compare = {"Maize" : compareSet["Maize"].values, "Soy" : compareSet["edSoy"].values, "Rice" : compareSet["dRice"].values, "Wheat" : compareSet["Wheat"].values}
+    for key in compare:
+        if compare[key]:
+            compare[key] = 0
+    print("In 2016:", compare)
+    return foodData, compareSet
+
+#loads weather model and predicts based on given parameters
+def predictWeather(year, lon, lat):
+    model = load("weatherModel.joblib")
+    scaler = load("weatherScaler.joblib")
+    data = [[year, lon, lat]]
+    data = scaler.transform(data)
+    return model.predict(data)
+
+#loads food model and predicts based on given parameters
+def predictFood(data, year):
+    model = load("foodModel.joblib")
+    scaler = load("foodScaler.joblib")
+    data = np.insert(data, [0], year)
+    data = data.reshape(1, -1)
+    data = scaler.transform(data)
+    return model.predict(data)
+
+
+predicted, comparison = makePrediction()
+print("             Maize:       Soy:         Rice:        Wheat:")
+print("Predicted:", predicted)
+print("Predictions are predicting possibility, not actuality.")
+
+
+# dataSet = xr.open_dataset("combinedDataset.nc4")
+# dataSet = dataSet.dropna(dim="Maize")
+# print(dataSet.sel(year=[2016]))
 
 #visualizeSlice(aggregateCrops(), "Maize", 2015)
 #xr.Dataset.to_netcdf(xr.merge([xr.open_dataset("aggregatedClimateData.nc4"), aggregateCrops()]), "combinedDataset.nc4")
@@ -306,5 +366,5 @@ def parseYear(yearIn):
 # hs.plot(ax=ax,title='%s at %s' % (h.long_name,nc.id))
 # ax.set_ylabel(h.units)
 
-#convert float32 time in days since 1900-1-1 to int year
+#prints total time spent on process
 print("Time spent:", time.time() - start, "seconds")
